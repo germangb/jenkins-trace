@@ -130,13 +130,11 @@ impl JenkinsTrace {
             crumb_request_field: String,
         }
 
-        let body = self
-            .client
-            .get(self.config.crumb_url.as_str())
-            .header("Authorization", "Basic cm9vdDpyb290")
-            .send()
-            .and_then(|req| req.text())
-            .await?;
+        let mut client = self.client.get(self.config.crumb_url.as_str());
+        if let Some((user, passwd)) = &self.config.auth {
+            client = client.basic_auth(user, passwd.as_ref());
+        }
+        let body = client.send().and_then(reqwest::Response::text).await?;
 
         let C {
             crumb,

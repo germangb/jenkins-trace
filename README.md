@@ -7,7 +7,8 @@ A crate that provides a simple primitive to read from [Jenkins] build log, speci
 ## Dependencies
 
 - `reqwest`
-- `tokio` (for the examples only)
+- `bytes`
+- `serde` & `serde_json`
 
 ## Features
 

@@ -1,7 +1,6 @@
 #![deny(unused)]
 
 use bytes::Bytes;
-use futures::TryFutureExt;
 use reqwest::{multipart::Form, Client, RequestBuilder, Response};
 use std::fmt;
 
@@ -106,13 +105,12 @@ impl JenkinsTrace {
             return Ok(None);
         }
 
-        // issue request to progressive log endpoint
-        // fail if response is non-2xx
-        let response = self.trace_request_future().await?.error_for_status()?;
+        // issue request to progressive log endpoint.
+        let response = self.trace_request_future().await?;
 
-        // X-More-Data
+        // X-More-Data header field
         let more_data = response.headers().contains_key(Self::MORE_DATA_FIELD);
-        // X-Text-Size
+        // X-Text-Size header field
         let text_size = response
             .headers()
             .get(Self::TEXT_SIZE_FIELD)
@@ -149,11 +147,14 @@ impl JenkinsTrace {
             crumb_request_field: String,
         }
 
-        let body = self
+        // issue crumb issuer request
+        // fail if result is not 2xx
+        let res = self
             .base_request(self.config.crumb_url.as_str())
             .send()
-            .and_then(reqwest::Response::text)
-            .await?;
+            .await
+            .and_then(reqwest::Response::error_for_status)?;
+        let body = res.text().await?;
 
         let C {
             crumb,
@@ -170,11 +171,14 @@ impl JenkinsTrace {
         // request CSRF crumb
         let (crumb_field, crumb) = self.csrf_crumb_future().await?;
 
+        // request next log
+        // fails if response code isn't 2xx
         Ok(self
             .base_request(&self.config.url)
             .multipart(Form::new().text("start", format!("{}", self.offset)))
             .header(&crumb_field, &crumb)
             .send()
-            .await?)
+            .await
+            .and_then(reqwest::Response::error_for_status)?)
     }
 }

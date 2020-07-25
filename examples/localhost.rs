@@ -4,7 +4,7 @@ use jenkins_trace::{Config, CrumbUrl, JenkinsTrace};
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // config specific job
     let config = Config {
-        url: "http://localhost:8080/job/foo/5/logText/progressiveText".to_string(),
+        url: "http://localhost:8080/job/foo/6/logText/progressiveText".to_string(),
         crumb_url: CrumbUrl::Json("http://localhost:8080/crumbIssuer/api/json".to_string()),
         auth: Some(("root".to_string(), Some("root".to_string()))),
     };

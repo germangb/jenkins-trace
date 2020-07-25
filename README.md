@@ -1,6 +1,6 @@
 # jenkins-trace
 
-A crate that provides a simple primitive to read from [Jenkins] build log, specifically through its `/progressiveText` or `/progressiveHtml` API.
+A crate that provides a simple primitive to read from a [Jenkins] build log, specifically through the `/progressiveText` or `/progressiveHtml` APIs.
 
 [Jenkins]: https://www.jenkins.io/
 

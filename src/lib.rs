@@ -2,7 +2,7 @@
 
 use bytes::Bytes;
 use futures::TryFutureExt;
-use reqwest::{multipart::Form, Client, Response};
+use reqwest::{multipart::Form, Client, RequestBuilder, Response};
 use std::fmt;
 
 /// CSRF Crumb request endpoint.
@@ -59,6 +59,7 @@ impl std::error::Error for Error {}
 
 /// Basic auth username & password.
 pub type Auth = (String, Option<String>);
+type Crumb = (String, String);
 
 /// Jenkins job
 #[derive(Clone, PartialEq, Eq, Hash)]
@@ -80,6 +81,7 @@ pub struct JenkinsTrace {
     // To keep track of the # of bytes read so far.
     offset: u64,
     ended: bool,
+    crumb: Option<Crumb>,
 }
 
 impl JenkinsTrace {
@@ -93,6 +95,7 @@ impl JenkinsTrace {
             client: Client::new(),
             offset: 0,
             ended: false,
+            crumb: None,
         }
     }
 
@@ -124,7 +127,21 @@ impl JenkinsTrace {
         Ok(Some(response.bytes().await?))
     }
 
-    async fn csrf_crumb_future(&mut self) -> Result<(String, String), Error> {
+    // create request with basic auth
+    fn base_request(&self, url: &str) -> RequestBuilder {
+        let req = self.client.get(url);
+        if let Some((user, passwd)) = &self.config.auth {
+            req.basic_auth(user, passwd.as_ref())
+        } else {
+            req
+        }
+    }
+
+    async fn csrf_crumb_future(&mut self) -> Result<Crumb, Error> {
+        if let Some(crumb) = &self.crumb {
+            return Ok(crumb.clone());
+        }
+
         #[derive(serde::Deserialize)]
         struct C {
             crumb: String,
@@ -132,11 +149,11 @@ impl JenkinsTrace {
             crumb_request_field: String,
         }
 
-        let mut client = self.client.get(self.config.crumb_url.as_str());
-        if let Some((user, passwd)) = &self.config.auth {
-            client = client.basic_auth(user, passwd.as_ref());
-        }
-        let body = client.send().and_then(reqwest::Response::text).await?;
+        let body = self
+            .base_request(self.config.crumb_url.as_str())
+            .send()
+            .and_then(reqwest::Response::text)
+            .await?;
 
         let C {
             crumb,
@@ -145,23 +162,19 @@ impl JenkinsTrace {
             CrumbUrl::Json(_) => serde_json::from_str(&body)?,
         };
 
-        Ok((crumb_request_field, crumb))
+        self.crumb = Some((crumb_request_field, crumb));
+        Ok(self.crumb.clone().unwrap())
     }
 
     async fn trace_request_future(&mut self) -> Result<Response, Error> {
         // request CSRF crumb
         let (crumb_field, crumb) = self.csrf_crumb_future().await?;
 
-        let form = Form::new().text("start", format!("{}", self.offset));
-        let mut client = self
-            .client
-            .get(&self.config.url)
-            .multipart(form)
-            .header(&crumb_field, &crumb);
-        if let Some((user, passwd)) = &self.config.auth {
-            client = client.basic_auth(user, passwd.as_ref());
-        }
-
-        Ok(client.send().await?)
+        Ok(self
+            .base_request(&self.config.url)
+            .multipart(Form::new().text("start", format!("{}", self.offset)))
+            .header(&crumb_field, &crumb)
+            .send()
+            .await?)
     }
 }

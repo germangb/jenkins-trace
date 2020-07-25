@@ -1,10 +1,12 @@
 use jenkins_trace::{Config, CrumbUrl, JenkinsTrace};
-use std::io::Cursor;
+use std::{io::Cursor, time::Duration};
 use structopt::StructOpt;
-use tokio::io::{copy, stdout};
+use tokio::{
+    io::{copy, stdout},
+    time::delay_for,
+};
 use url::Url;
 
-/// Command-line arguments.
 #[derive(Debug, StructOpt)]
 struct Opt {
     /// Jenkins host.
@@ -19,9 +21,12 @@ struct Opt {
     /// Use HTML output.
     #[structopt(short = "H", long)]
     html: bool,
-    /// Jenkins login credentials.
+    /// Jenkins login credentials (username:password).
     #[structopt(short, long)]
     user: Option<String>,
+    /// Delay between requests in seconds.
+    #[structopt(short, long, default_value = "1.0")]
+    delay: f64,
 }
 
 impl Opt {
@@ -45,7 +50,7 @@ impl Opt {
     }
 
     /// Return crumb endpoint.
-    fn crumb(&self) -> CrumbUrl {
+    fn crumb_url(&self) -> CrumbUrl {
         let url = format!("{}/crumbIssuer/api/json", self.host);
         CrumbUrl::Json(
             Url::parse(&url)
@@ -56,14 +61,12 @@ impl Opt {
 
     /// Return Basic auth.
     fn auth(&self) -> Option<(String, Option<String>)> {
-        if let Some(auth) = &self.user {
+        self.user.as_ref().map(|auth| {
             let mut split = auth.split(':');
             let user = split.next().unwrap().to_string();
             let pass = split.next().map(|p| p.to_string());
-            Some((user, pass))
-        } else {
-            None
-        }
+            (user, pass)
+        })
     }
 }
 
@@ -71,16 +74,15 @@ impl Opt {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let opt = Opt::from_args();
 
-    let config = Config {
+    let mut trace = JenkinsTrace::new(Config {
         url: opt.url(),
-        crumb_url: opt.crumb(),
+        crumb_url: opt.crumb_url(),
         auth: opt.auth(),
-    };
-
-    let mut trace = JenkinsTrace::new(config);
+    });
 
     while let Some(bytes) = trace.next_trace().await? {
         copy(&mut Cursor::new(bytes), &mut stdout()).await?;
+        delay_for(Duration::from_secs_f64(opt.delay)).await;
     }
 
     Ok(())

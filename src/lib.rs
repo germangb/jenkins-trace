@@ -64,10 +64,10 @@ type Crumb = (String, String);
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Config {
     /// Job url. Must be one of either:
-    /// - `http://<server>/job/foo/<build_id>/progressiveText`
-    /// - `http://<server>/job/foo/<build_id>/progressiveHtml`
+    /// - `http://<server>/job/<project>/<build_id>/progressiveText`
+    /// - `http://<server>/job/<project>/<build_id>/progressiveHtml`
     pub url: String,
-    /// Crumb endpoint, must be
+    /// Crumb endpoint.
     pub crumb_url: CrumbUrl,
     /// HTTP basic auth.
     pub auth: Option<Auth>,
@@ -107,7 +107,6 @@ impl JenkinsTrace {
 
         // issue request to progressive log endpoint.
         let response = self.trace_request_future().await?;
-
         // X-More-Data header field
         let more_data = response.headers().contains_key(Self::MORE_DATA_FIELD);
         // X-Text-Size header field
@@ -153,7 +152,7 @@ impl JenkinsTrace {
             .base_request(self.config.crumb_url.as_str())
             .send()
             .await
-            .and_then(reqwest::Response::error_for_status)?;
+            .and_then(Response::error_for_status)?;
         let body = res.text().await?;
 
         let C {
@@ -179,6 +178,6 @@ impl JenkinsTrace {
             .header(&crumb_field, &crumb)
             .send()
             .await
-            .and_then(reqwest::Response::error_for_status)?)
+            .and_then(Response::error_for_status)?)
     }
 }

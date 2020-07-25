@@ -30,7 +30,6 @@ $ cargo build --bin trace
 ```bash
 $ target/debug/trace --help
 jenkins-trace 0.1.0
-Command-line arguments
 
 USAGE:
     trace [FLAGS] [OPTIONS] --build <build> --host <host> --job <job>

@@ -1,7 +1,12 @@
 use bytes::Bytes;
 use futures::TryFutureExt;
 use reqwest::{multipart::Form, Client, Response};
-use std::{fmt, future::Future};
+use std::{
+    fmt,
+    future::Future,
+    pin::Pin,
+    task::{Context, Poll},
+};
 
 /// CSRF Crumb request endpoint.
 ///

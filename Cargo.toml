@@ -16,3 +16,7 @@ serde_json = "1.0"
 
 [dev-dependencies]
 tokio = { version = "0.2", features = ["full"] }
+
+[features]
+default = []
+tls = ["reqwest/default-tls"]

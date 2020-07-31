@@ -8,15 +8,18 @@ use std::fmt;
 ///
 /// Must be one of:
 /// - http://<server>/crumbIssuer/api/json
+/// - http://<server>/crumbIssuer/api/xml
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CrumbUrl {
     Json(String),
+    Xml(String),
 }
 
 impl CrumbUrl {
     fn as_str(&self) -> &str {
         match self {
             CrumbUrl::Json(url) => url.as_str(),
+            CrumbUrl::Xml(url) => url.as_str(),
         }
     }
 }
@@ -28,8 +31,10 @@ pub enum Error {
     Reqwest(reqwest::Error),
     /// Some error related to Jenkins service.
     Jenkins(&'static str),
-    /// JSON error when parsing the CSRF crumb.
+    /// JSON parsing error.
     Json(serde_json::Error),
+    /// XML parsing error.
+    Xml(serde_xml_rs::Error),
 }
 
 impl From<reqwest::Error> for Error {
@@ -44,12 +49,19 @@ impl From<serde_json::Error> for Error {
     }
 }
 
+impl From<serde_xml_rs::Error> for Error {
+    fn from(error: serde_xml_rs::Error) -> Self {
+        Error::Xml(error)
+    }
+}
+
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Reqwest(req) => req.fmt(f),
             Error::Jenkins(jen) => jen.fmt(f),
             Error::Json(json) => json.fmt(f),
+            Error::Xml(xml) => xml.fmt(f),
         }
     }
 }
@@ -63,7 +75,7 @@ type Crumb = (String, String);
 /// Jenkins job
 #[derive(Clone, PartialEq, Eq, Hash)]
 pub struct Config {
-    /// Job url. Must be one of either:
+    /// Job url. Must be one of:
     /// - `http://<server>/job/<project>/<build_id>/progressiveText`
     /// - `http://<server>/job/<project>/<build_id>/progressiveHtml`
     pub url: String,
@@ -160,6 +172,7 @@ impl JenkinsTrace {
             crumb_request_field,
         } = match self.config.crumb_url {
             CrumbUrl::Json(_) => serde_json::from_str(&body)?,
+            CrumbUrl::Xml(_) => serde_xml_rs::from_str(&body)?,
         };
 
         self.crumb = Some((crumb_request_field, crumb));

@@ -41,7 +41,8 @@ FLAGS:
 
 OPTIONS:
     -b, --build <build>    Numeric ID of the build
+    -d, --delay <delay>    Delay between requests in seconds [default: 1.0]
     -h, --host <host>      Jenkins host
     -j, --job <job>        Jenkins project name
-    -u, --user <user>      Jenkins login credentials
+    -u, --user <user>      Jenkins login credentials (username:password)
 ```
